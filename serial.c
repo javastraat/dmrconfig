@@ -738,68 +738,68 @@ again:
 
 void serial_read_region(int addr, unsigned char *data, int nbytes)
 {
-    static const int DATASZ = 64;
-    unsigned char cmd[6], reply[8 + DATASZ];
+#define READ_DATASZ 64
+    unsigned char cmd[6], reply[8 + READ_DATASZ];
     int n, i, retry = 0;
 
-    for (n=0; n<nbytes; n+=DATASZ) {
+    for (n=0; n<nbytes; n+=READ_DATASZ) {
         // Read command: 52 aa aa aa aa 10
         cmd[0] = CMD_READ[0];
         cmd[1] = (addr + n) >> 24;
         cmd[2] = (addr + n) >> 16;
         cmd[3] = (addr + n) >> 8;
         cmd[4] = addr + n;
-        cmd[5] = DATASZ;
+        cmd[5] = READ_DATASZ;
 again:
         send_recv(cmd, 6, reply, sizeof(reply));
-        if (reply[0] != CMD_WRITE[0] || reply[7+DATASZ] != CMD_ACK[0]) {
+        if (reply[0] != CMD_WRITE[0] || reply[7+READ_DATASZ] != CMD_ACK[0]) {
             fprintf(stderr, "%s: Wrong read reply %02x-...-%02x, expected %02x-...-%02x\n",
-                __func__, reply[0], reply[7+DATASZ], CMD_WRITE[0], CMD_ACK[0]);
+                __func__, reply[0], reply[7+READ_DATASZ], CMD_WRITE[0], CMD_ACK[0]);
             exit(-1);
         }
 
         // Compute checksum.
         unsigned char sum = reply[1];
-        for (i=2; i<6+DATASZ; i++)
+        for (i=2; i<6+READ_DATASZ; i++)
             sum += reply[i];
-        if (reply[6+DATASZ] != sum) {
+        if (reply[6+READ_DATASZ] != sum) {
             fprintf(stderr, "%s: Wrong read checksum %02x, expected %02x\n",
-                __func__, sum, reply[6+DATASZ]);
+                __func__, sum, reply[6+READ_DATASZ]);
             if (retry++ < 3)
                 goto again;
             exit(-1);
         }
 
-        memcpy(data + n, reply + 6, DATASZ);
+        memcpy(data + n, reply + 6, READ_DATASZ);
     }
 }
 
 void serial_write_region(int addr, unsigned char *data, int nbytes)
 {
     //static const int DATASZ = 64;
-    static const int DATASZ = 16;
-    unsigned char ack, cmd[8 + DATASZ];
+#define WRITE_DATASZ 16
+    unsigned char ack, cmd[8 + WRITE_DATASZ];
     int n, i;
 
-    for (n=0; n<nbytes; n+=DATASZ) {
+    for (n=0; n<nbytes; n+=WRITE_DATASZ) {
         // Write command: 57 aa aa aa aa 10 .. .. ss nn
         cmd[0] = CMD_WRITE[0];
         cmd[1] = (addr + n) >> 24;
         cmd[2] = (addr + n) >> 16;
         cmd[3] = (addr + n) >> 8;
         cmd[4] = addr + n;
-        cmd[5] = DATASZ;
-        memcpy(cmd + 6, data + n, DATASZ);
+        cmd[5] = WRITE_DATASZ;
+        memcpy(cmd + 6, data + n, WRITE_DATASZ);
 
         // Compute checksum.
         unsigned char sum = cmd[1];
-        for (i=2; i<6+DATASZ; i++)
+        for (i=2; i<6+WRITE_DATASZ; i++)
             sum += cmd[i];
 
-        cmd[6 + DATASZ] = sum;
-        cmd[7 + DATASZ] = CMD_ACK[0];
+        cmd[6 + WRITE_DATASZ] = sum;
+        cmd[7 + WRITE_DATASZ] = CMD_ACK[0];
 
-        send_recv(cmd, 8 + DATASZ, &ack, 1);
+        send_recv(cmd, 8 + WRITE_DATASZ, &ack, 1);
         if (ack != CMD_ACK[0]) {
             fprintf(stderr, "%s: Wrong acknowledge %#x, expected %#x\n",
                 __func__, ack, CMD_ACK[0]);
