@@ -17,7 +17,7 @@ DMRconfig is a utility for programming digital radios via USB programming cable.
  * Anytone AT-D868UV
  * Anytone AT-D878UV
  * Anytone AT-D878UVII
- * Anytone AT-D168UV
+ * Anytone AT-D168UV (supports up to 500,000 digital contacts)
  * BTECH DMR-6x2
  * Zastone D900
  * Zastone DP880
@@ -52,6 +52,10 @@ Apply configuration from text file to the codeplug file:
 Update database of contacts from CSV file:
 
     dmrconfig -u [-t] file.csv
+
+**Note for Anytone AT-D168UV:** After updating the contact database, the radio will 
+automatically display "Copying Data To The Radio" and reboot. This is normal behavior 
+as the radio copies the database to internal memory. Do not power off during this process.
 
 Option -t enables tracing of USB protocol.
 
