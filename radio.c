@@ -52,6 +52,7 @@ static struct {
     { "D868UVE",    &radio_d868uv },    // Anytone AT-D868UV
     { "D878UV2",    &radio_d878uv2 },   // Anytone AT-D878UV2
     { "D878UV",     &radio_d878uv },    // Anytone AT-D878UV
+    { "D168UV",     &radio_d168uv },    // Anytone AT-D168UV
     { "D6X2UV",     &radio_dmr6x2 },    // BTECH DMR-6x2
     { "ZD3688",     &radio_d900 },      // Zastone D900
     { "TP660",      &radio_dp880 },     // Zastone DP880
@@ -104,6 +105,11 @@ void radio_connect()
     if (! ident) {
         // Try Anytone family.
         if (serial_init(0x28e9, 0x018a) >= 0)
+            ident = serial_identify();
+    }
+    if (! ident) {
+        // Try Anytone D168 family.
+        if (serial_init(0x2e3c, 0x5740) >= 0)
             ident = serial_identify();
     }
     if (! ident) {
@@ -218,6 +224,8 @@ void radio_read_image(const char *filename)
             device = &radio_d878uv2;
         } else if (memcmp(ident, "D878UV", 6) == 0) {
             device = &radio_d878uv;
+        } else if (memcmp(ident, "D168UV", 6) == 0) {
+            device = &radio_d168uv;
         } else if (memcmp(ident, "D6X2UV", 6) == 0) {
             device = &radio_dmr6x2;
         } else {

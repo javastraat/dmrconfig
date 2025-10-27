@@ -1,5 +1,5 @@
 /*
- * Interface to Anytone D868UV/D878UV/D878UV2.
+ * Interface to Anytone D868UV/D878UV/D878UV2/D168UV.
  *
  * Copyright (C) 2018 Serge Vakulenko, KK6ABQ
  *
@@ -43,8 +43,8 @@
 #define NGLISTS         250
 #define NSCANL          250
 #define NMESSAGES       100
-#define NCALLSIGNS      200000
-#define CALLSIGN_SIZE   (12*1024*1024)  // Size of callsign data
+#define NCALLSIGNS      500000
+#define CALLSIGN_SIZE   (30*1024*1024)  // Size of callsign data (increased for 500k contacts)
 
 //
 // Offsets in the image file.
@@ -68,11 +68,23 @@
 
 //
 // Addresses in the radio flash memory.
+// D868UV/D878UV/D878UV2 use addresses starting at 0x04000000
+// D168UV uses addresses starting at 0x05000000 (16MB higher)
 //
-#define ADDR_CALLDB_LIST    0x04000000  // Map of callsign database
-#define ADDR_CONT_ID_LIST   0x04280000  // Map of contact IDs to contacts
-#define ADDR_CALLDB_SIZE    0x044c0000  // Sizes of callsign database
-#define ADDR_CALLDB_DATA    0x04500000  // Data of callsign database
+#define ADDR_CALLDB_LIST_D8      0x04000000  // Map of callsign database (D868UV/D878UV)
+#define ADDR_CALLDB_SIZE_D8      0x044c0000  // Sizes of callsign database (D868UV/D878UV)
+#define ADDR_CALLDB_DATA_D8      0x04500000  // Data of callsign database (D868UV/D878UV)
+
+#define ADDR_CALLDB_LIST_D1      0x05000000  // Map of callsign database (D168UV)
+#define ADDR_CALLDB_SIZE_D1      0x054c0000  // Sizes of callsign database (D168UV)
+#define ADDR_CALLDB_DATA_D1      0x05500000  // Data of callsign database (D168UV)
+
+#define ADDR_CONT_ID_LIST        0x04280000  // Map of contact IDs to contacts
+
+// Legacy defines for backward compatibility
+#define ADDR_CALLDB_LIST    ADDR_CALLDB_LIST_D8
+#define ADDR_CALLDB_SIZE    ADDR_CALLDB_SIZE_D8
+#define ADDR_CALLDB_DATA    ADDR_CALLDB_DATA_D8
 
 #define GET_SETTINGS()      ((general_settings_t*) &radio_mem[OFFSET_SETTINGS])
 #define GET_RADIOID()       ((radioid_t*) &radio_mem[OFFSET_RADIOID])
@@ -91,6 +103,56 @@
 
 #define VALID_TEXT(txt)     (*(txt) != 0 && *(txt) != 0xff)
 #define VALID_GROUPLIST(gl) ((gl)->member[0] != 0xffffffff && VALID_TEXT((gl)->name))
+
+//
+// Helper functions to get correct callsign database addresses based on radio model
+//
+static int is_d168uv_radio_ptr(radio_device_t *radio)
+{
+    // Forward declaration needed
+    extern radio_device_t radio_d168uv;
+    return (radio == &radio_d168uv);
+}
+
+static int is_d168uv_radio(void)
+{
+    // Check if this is a D168UV by looking at the radio identifier in memory
+    return (memcmp("D168UV", (char*)&radio_mem[0], 6) == 0);
+}
+
+static unsigned get_calldb_list_addr_for_radio(radio_device_t *radio)
+{
+    return is_d168uv_radio_ptr(radio) ? ADDR_CALLDB_LIST_D1 : ADDR_CALLDB_LIST_D8;
+}
+
+static unsigned get_calldb_size_addr_for_radio(radio_device_t *radio)
+{
+    return is_d168uv_radio_ptr(radio) ? ADDR_CALLDB_SIZE_D1 : ADDR_CALLDB_SIZE_D8;
+}
+
+static unsigned get_calldb_data_addr_for_radio(radio_device_t *radio)
+{
+    return is_d168uv_radio_ptr(radio) ? ADDR_CALLDB_DATA_D1 : ADDR_CALLDB_DATA_D8;
+}
+
+// Memory-based detection functions (used when radio_mem is loaded)
+static unsigned get_calldb_list_addr(void) __attribute__((unused));
+static unsigned get_calldb_list_addr(void)
+{
+    return is_d168uv_radio() ? ADDR_CALLDB_LIST_D1 : ADDR_CALLDB_LIST_D8;
+}
+
+static unsigned get_calldb_size_addr(void) __attribute__((unused));
+static unsigned get_calldb_size_addr(void)
+{
+    return is_d168uv_radio() ? ADDR_CALLDB_SIZE_D1 : ADDR_CALLDB_SIZE_D8;
+}
+
+static unsigned get_calldb_data_addr(void) __attribute__((unused));
+static unsigned get_calldb_data_addr(void)
+{
+    return is_d168uv_radio() ? ADDR_CALLDB_DATA_D1 : ADDR_CALLDB_DATA_D8;
+}
 
 //
 // Size of memory image.
@@ -696,6 +758,8 @@ static int anytone_ht_is_compatible(radio_device_t *radio)
     if (memcmp("D878UV", (char*)&radio_mem[0], 6) == 0)
         return 1;
     if (memcmp("D6X2UV", (char*)&radio_mem[0], 6) == 0)
+        return 1;
+    if (memcmp("D168UV", (char*)&radio_mem[0], 6) == 0)
         return 1;
     return 0;
 }
@@ -2751,15 +2815,15 @@ static void dump_csv(radio_device_t *radio)
     //
     // Dump sizes.
     //
-    serial_read_region(ADDR_CALLDB_SIZE, (uint8_t*) &sz, 16);
+    serial_read_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &sz, 16);
     printf("Sizes:\n");
-    print_hex_addr_data(ADDR_CALLDB_SIZE, (uint8_t*)&sz, sizeof(sz));
+    print_hex_addr_data(get_calldb_size_addr_for_radio(radio), (uint8_t*)&sz, sizeof(sz));
     printf("\n");
 
     //
     // Dump callsign map.
     //
-    unsigned addr = ADDR_CALLDB_LIST;
+    unsigned addr = get_calldb_list_addr_for_radio(radio);
     unsigned index;
 
     printf("Map:\n");
@@ -2779,11 +2843,20 @@ static void dump_csv(radio_device_t *radio)
     // Dump data.
     //
     printf("Data:\n");
-    addr = ADDR_CALLDB_DATA;
+    addr = get_calldb_data_addr_for_radio(radio);
+    
+    // Force dump up to 50MB to find all database copies
+    unsigned max_addr = get_calldb_data_addr_for_radio(radio) + 50*1024*1024; // 50MB range
+    
     for (index = 0; index < 10000000; index += 100000) {
         int n = sz.last - addr;
-        if (n < 0)
+        
+        // Override: dump much more than sz.last indicates
+        if (addr >= max_addr)
             break;
+        
+        if (n <= 0)
+            n = 100000; // Continue dumping even past sz.last
         else if (n > 100000)
             n = 100000;
         else
@@ -2937,13 +3010,48 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     }
     fprintf(stderr, "Total %d contacts, %d bytes.\n", sz.count, nbytes);
 
-    sz.last = ADDR_CALLDB_DATA + (nbytes / 100000) * 256*1024 + (nbytes % 100000);
+    sz.last = get_calldb_data_addr_for_radio(radio) + (nbytes / 100000) * 256*1024 + (nbytes % 100000);
 
     // Append extra zeroes and align.
     nbytes = (nbytes + 63) & ~15;
 
     // Sort the map by DMR ID.
     qsort(map, sz.count, sizeof(map[0]), compare_callsign_map);
+
+    //
+    // Read old database size to determine how much to clear (D168UV only).
+    // D168UV has a two-stage database (CPS area + firmware area) that requires clearing.
+    //
+    callsign_sizes_t old_sz = {0};
+    unsigned old_data_size = 0;
+    if (is_d168uv_radio_ptr(radio)) {
+        serial_read_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &old_sz, 16);
+        if (old_sz.last > get_calldb_data_addr_for_radio(radio)) {
+            old_data_size = old_sz.last - get_calldb_data_addr_for_radio(radio);
+        }
+    }
+    
+    //
+    // Clear old database first - write count=0 to ensure clean replacement (D168UV only).
+    // This prevents old entries from persisting when new database is smaller.
+    //
+    if (is_d168uv_radio_ptr(radio)) {
+        if (! trace_flag) {
+            fprintf(stderr, "Clearing old database (was %d contacts, %u bytes)...", old_sz.count, old_data_size);
+            fflush(stderr);
+        }
+        callsign_sizes_t clear_sz = {0};  // All zeros
+        serial_write_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &clear_sz, 16);
+        
+        // Also clear the first chunk of the map to remove old entries
+        unsigned char clear_map[128000];
+        memset(clear_map, 0xff, sizeof(clear_map));  // 0xff = invalid entries
+        serial_write_region(get_calldb_list_addr_for_radio(radio), clear_map, sizeof(clear_map));
+        
+        if (! trace_flag) {
+            fprintf(stderr, " done.\n");
+        }
+    }
 
     if (! trace_flag) {
         fprintf(stderr, "Write: ");
@@ -2953,7 +3061,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     //
     // Write callsign map.
     //
-    unsigned addr = ADDR_CALLDB_LIST;
+    unsigned addr = get_calldb_list_addr_for_radio(radio);
     unsigned index;
 
 //#define DUMP_NO_WRITE
@@ -2982,15 +3090,23 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     //
 #ifdef DUMP_NO_WRITE
     printf("\nSizes:\n");
-    print_hex_addr_data(ADDR_CALLDB_SIZE, (uint8_t*) &sz, 16);
+    print_hex_addr_data(get_calldb_size_addr_for_radio(radio), (uint8_t*) &sz, 16);
 #else
-    serial_write_region(ADDR_CALLDB_SIZE, (uint8_t*) &sz, 16);
+    // Set copy trigger flag in unused3 for radios that need it.
+    // D168UV confirmed: unused3=1 triggers firmware to copy database from CPS area
+    // to internal memory, then auto-reboot. Radio shows "Copying Data To The Radio".
+    // TODO: Test if D868UV/D878UV/D878UV2 also need this trigger.
+    if (is_d168uv_radio_ptr(radio)) {
+        sz._unused3 = 1;  // Signal firmware to copy database
+        fprintf(stderr, "\nTriggering database copy for D168UV...\n");
+    }
+    serial_write_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &sz, 16);
 #endif
 
     //
     // Write data.
     //
-    addr = ADDR_CALLDB_DATA;
+    addr = get_calldb_data_addr_for_radio(radio);
 #ifdef DUMP_NO_WRITE
     printf("\nData:\n");
 #endif
@@ -3010,8 +3126,51 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
         fflush(stderr);
     }
 
-    if (! trace_flag)
-        fprintf(stderr, "# done.\n");
+    //
+    // Write zeros after data to clear any old entries that might remain (D168UV only).
+    // Only clear if new database is smaller than old database.
+    //
+    if (is_d168uv_radio_ptr(radio) && old_data_size > nbytes) {
+        unsigned clear_size = old_data_size - nbytes;
+        if (! trace_flag) {
+            fprintf(stderr, "\nClearing %u bytes of old data...", clear_size);
+            fflush(stderr);
+        }
+        
+        unsigned char *zeros = calloc(1, 100000);  // 100KB chunk
+        if (zeros) {
+            for (index = 0; index < clear_size; index += 100000) {
+                unsigned n = clear_size - index;
+                if (n > 100000)
+                    n = 100000;
+                
+                serial_write_region(addr, zeros, n);
+                addr += 256*1024;
+                
+                if (index % 500000 == 0) {
+                    fprintf(stderr, ".");
+                    fflush(stderr);
+                }
+            }
+            free(zeros);
+            
+            if (! trace_flag) {
+                fprintf(stderr, " done.\n");
+            }
+        }
+    } else if (! trace_flag) {
+        fprintf(stderr, "\n");
+    }
+
+    if (! trace_flag) {
+        fprintf(stderr, " done.\n");
+        // For D168UV, remind user to reboot for database to take effect
+        if (is_d168uv_radio_ptr(radio)) {
+            fprintf(stderr, "\n");
+            fprintf(stderr, "*** D168UV: Please REBOOT the radio for the database to take effect. ***\n");
+            fprintf(stderr, "*** The radio will copy the database to internal memory on next boot. ***\n");
+        }
+    }
     free(data);
 }
 
@@ -3080,6 +3239,26 @@ radio_device_t radio_d878uv2 = {
 //
 radio_device_t radio_dmr6x2 = {
     "BTECH DMR-6x2",
+    anytone_ht_download,
+    anytone_ht_upload,
+    anytone_ht_is_compatible,
+    anytone_ht_read_image,
+    anytone_ht_save_image,
+    anytone_ht_print_version,
+    anytone_ht_print_config,
+    anytone_ht_verify_config,
+    anytone_ht_parse_parameter,
+    anytone_ht_parse_header,
+    anytone_ht_parse_row,
+    anytone_ht_update_timestamp,
+    anytone_ht_write_csv,
+};
+
+//
+// Anytone AT-D168UV
+//
+radio_device_t radio_d168uv = {
+    "Anytone AT-D168UV",
     anytone_ht_download,
     anytone_ht_upload,
     anytone_ht_is_compatible,

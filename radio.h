@@ -134,6 +134,7 @@ extern radio_device_t radio_dm1801;     // Baofeng DM-1801
 extern radio_device_t radio_d868uv;     // Anytone AT-D868UV
 extern radio_device_t radio_d878uv;     // Anytone AT-D878UV
 extern radio_device_t radio_d878uv2;    // Anytone AT-D878UV2
+extern radio_device_t radio_d168uv;     // Anytone AT-D168UV
 extern radio_device_t radio_dmr6x2;     // BTECH DMR-6x2
 extern radio_device_t radio_rt84;       // Baofeng DM-1701, Retevis RT84
 
