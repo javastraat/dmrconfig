@@ -3008,6 +3008,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 
         nbytes = p - data;
     }
+    unsigned original_nbytes = nbytes;  // Save original size for progress display
     fprintf(stderr, "Total %d contacts, %d bytes.\n", sz.count, nbytes);
 
     sz.last = get_calldb_data_addr_for_radio(radio) + (nbytes / 100000) * 256*1024 + (nbytes % 100000);
@@ -3037,7 +3038,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     //
     if (is_d168uv_radio_ptr(radio)) {
         if (! trace_flag) {
-            fprintf(stderr, "Clearing old database (was %d contacts, %u bytes)...", old_sz.count, old_data_size);
+            fprintf(stderr, "Making old database invalid (was %d contacts, %u bytes)...", old_sz.count, old_data_size);
             fflush(stderr);
         }
         callsign_sizes_t clear_sz = {0};  // All zeros
@@ -3063,6 +3064,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     //
     unsigned addr = get_calldb_list_addr_for_radio(radio);
     unsigned index;
+    unsigned total_bytes_written = 0;
 
 //#define DUMP_NO_WRITE
 #ifdef DUMP_NO_WRITE
@@ -3081,8 +3083,12 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 #endif
         addr += 256*1024;
 
-        fprintf(stderr, "#");
-        fflush(stderr);
+        if (! trace_flag) {
+            total_bytes_written += n;
+            int percent = (int)(total_bytes_written * 100 / original_nbytes);
+            fprintf(stderr, "\rWrite: %u bytes... %d%%", original_nbytes, percent);
+            fflush(stderr);
+        }
     }
 
     //
@@ -3121,8 +3127,19 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 #endif
         addr += 256*1024;
 
-        fprintf(stderr, "#");
+        if (! trace_flag) {
+            // Continue cumulative byte count from map writing
+            total_bytes_written += n;
+            int percent = (int)(total_bytes_written * 100 / original_nbytes);
+            fprintf(stderr, "\rWrite: %u bytes... %d%%", original_nbytes, percent);
+            fflush(stderr);
+        }
         fflush(stderr);
+    }
+
+    // Show write completion
+    if (! trace_flag) {
+        fprintf(stderr, "\rWrite: %u bytes... done.\n", original_nbytes);
     }
 
     //
@@ -3132,12 +3149,13 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     if (is_d168uv_radio_ptr(radio) && old_data_size > nbytes) {
         unsigned clear_size = old_data_size - nbytes;
         if (! trace_flag) {
-            fprintf(stderr, "\nClearing %u bytes of old data...", clear_size);
+            fprintf(stderr, "Clearing %u bytes of old data... 0%%", clear_size);
             fflush(stderr);
         }
         
         unsigned char *zeros = calloc(1, 100000);  // 100KB chunk
         if (zeros) {
+            int last_percent = -1;
             for (index = 0; index < clear_size; index += 100000) {
                 unsigned n = clear_size - index;
                 if (n > 100000)
@@ -3146,24 +3164,25 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
                 serial_write_region(addr, zeros, n);
                 addr += 256*1024;
                 
-                if (index % 500000 == 0) {
-                    fprintf(stderr, ".");
-                    fflush(stderr);
+                // Show percentage progress every 1% or so
+                if (! trace_flag) {
+                    int percent = (int)((index + n) * 100 / clear_size);
+                    if (percent != last_percent) {
+                        fprintf(stderr, "\rClearing %u bytes of old data... %d%%", clear_size, percent);
+                        fflush(stderr);
+                        last_percent = percent;
+                    }
                 }
             }
             free(zeros);
             
             if (! trace_flag) {
-                fprintf(stderr, " done.\n");
+                fprintf(stderr, "\rClearing %u bytes of old data... done.\n", clear_size);
             }
         }
-    } else if (! trace_flag) {
-        fprintf(stderr, "\n");
     }
 
     if (! trace_flag) {
-        fprintf(stderr, " done.\n");
-        
         // For D168UV, show trigger message with corrected information
         if (is_d168uv_radio_ptr(radio)) {
             fprintf(stderr, "Triggering database copy for D168UV...\n");
