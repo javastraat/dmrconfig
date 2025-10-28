@@ -3196,6 +3196,81 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 }
 
 //
+// Clear entire contacts database (D168UV only).
+//
+static void anytone_ht_clear_database(radio_device_t *radio)
+{
+    if (!is_d168uv_radio_ptr(radio)) {
+        fprintf(stderr, "Database clearing only supported on D168UV.\n");
+        return;
+    }
+
+    // Read current database info
+    callsign_sizes_t old_sz;
+    serial_read_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &old_sz, 16);
+    unsigned old_data_size = 0;
+    if (old_sz.count > 0) {
+        old_data_size = old_sz.last - get_calldb_data_addr_for_radio(radio);
+    }
+
+    fprintf(stderr, "Clearing contacts database (was %d contacts, %u bytes)...\n", old_sz.count, old_data_size);
+    
+    // Step 1: Set count to 0
+    callsign_sizes_t clear_sz = {0};
+    serial_write_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &clear_sz, 16);
+    
+    // Step 2: Clear map area
+    unsigned char clear_map[128000];
+    memset(clear_map, 0xff, sizeof(clear_map));
+    unsigned addr = get_calldb_list_addr_for_radio(radio);
+    
+    fprintf(stderr, "Invalidating contact map...\n");
+    for (int i = 0; i < 8; i++) {
+        serial_write_region(addr, clear_map, sizeof(clear_map));
+        addr += 256*1024;
+    }
+    
+    // Step 3: Clear old data if any
+    if (old_data_size > 0) {
+        unsigned char *zeros = calloc(1, 100000);
+        if (zeros) {
+            addr = get_calldb_data_addr_for_radio(radio);
+            unsigned index;
+            int last_percent = -1;
+            
+            fprintf(stderr, "Clearing %u bytes of old data... 0%%", old_data_size);
+            fflush(stderr);
+            
+            for (index = 0; index < old_data_size; index += 100000) {
+                unsigned n = old_data_size - index;
+                if (n > 100000)
+                    n = 100000;
+                
+                serial_write_region(addr, zeros, n);
+                addr += 256*1024;
+                
+                int percent = (int)((index + n) * 100 / old_data_size);
+                if (percent != last_percent) {
+                    fprintf(stderr, "\rClearing %u bytes of old data... %d%%", old_data_size, percent);
+                    fflush(stderr);
+                    last_percent = percent;
+                }
+            }
+            
+            fprintf(stderr, "\rClearing %u bytes of old data... done.\n", old_data_size);
+            free(zeros);
+        }
+    }
+    
+    // Step 4: Trigger database copy to finalize clearing
+    clear_sz._unused3 = 1;
+    serial_write_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &clear_sz, 16);
+    
+    fprintf(stderr, "Database cleared successfully.\n");
+    fprintf(stderr, "*** D168UV: Please REBOOT the radio for changes to take effect. ***\n");
+}
+
+//
 // Anytone AT-D868UV
 //
 radio_device_t radio_d868uv = {
@@ -3213,6 +3288,8 @@ radio_device_t radio_d868uv = {
     anytone_ht_parse_row,
     anytone_ht_update_timestamp,
     anytone_ht_write_csv,
+    anytone_ht_clear_database,
+    0,
 };
 
 //
@@ -3233,6 +3310,8 @@ radio_device_t radio_d878uv = {
     anytone_ht_parse_row,
     anytone_ht_update_timestamp,
     anytone_ht_write_csv,
+    anytone_ht_clear_database,
+    0,
 };
 
 //
@@ -3253,6 +3332,8 @@ radio_device_t radio_d878uv2 = {
     anytone_ht_parse_row,
     anytone_ht_update_timestamp,
     anytone_ht_write_csv,
+    anytone_ht_clear_database,
+    0,
 };
 
 //
@@ -3273,6 +3354,8 @@ radio_device_t radio_dmr6x2 = {
     anytone_ht_parse_row,
     anytone_ht_update_timestamp,
     anytone_ht_write_csv,
+    anytone_ht_clear_database,
+    0,
 };
 
 //
@@ -3293,4 +3376,6 @@ radio_device_t radio_d168uv = {
     anytone_ht_parse_row,
     anytone_ht_update_timestamp,
     anytone_ht_write_csv,
+    anytone_ht_clear_database,
+    0,
 };

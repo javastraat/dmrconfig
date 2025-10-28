@@ -2246,6 +2246,8 @@ radio_device_t radio_md380 = {
     md380_parse_row,
     md380_update_timestamp,
     //TODO: md380_write_csv,
+    0, // clear_database not supported
+    0,
 };
 
 //

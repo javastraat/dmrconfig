@@ -64,6 +64,8 @@ void usage()
     fprintf(stderr, "                         Display configuration from the codeplug image.\n");
     fprintf(stderr, "    dmrconfig -u [-t] file.csv\n");
     fprintf(stderr, "                         Update contacts database from CSV file.\n");
+    fprintf(stderr, "    dmrconfig -X [-t]\n");
+    fprintf(stderr, "                         Clear entire contacts database (D168UV only).\n");
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "    -r           Read codeplug from the radio.\n");
     fprintf(stderr, "    -w           Write codeplug to the radio.\n");
@@ -71,6 +73,7 @@ void usage()
     fprintf(stderr, "    -v           Verify config file.\n");
     fprintf(stderr, "    -z           Validate config file.\n");
     fprintf(stderr, "    -u           Update contacts database.\n");
+    fprintf(stderr, "    -X           Clear entire contacts database (D168UV only).\n");
     fprintf(stderr, "    -l           List all supported radios.\n");
     fprintf(stderr, "    -t           Trace USB protocol.\n");
     exit(-1);
@@ -79,17 +82,18 @@ void usage()
 int main(int argc, char **argv)
 {
     int read_flag = 0, write_flag = 0, config_flag = 0, csv_flag = 0;
-    int list_flag = 0, verify_flag = 0, validate_flag = 0;
+    int list_flag = 0, verify_flag = 0, validate_flag = 0, clear_flag = 0;
 
     copyright = "Copyright (C) 2018 Serge Vakulenko KK6ABQ";
     trace_flag = 0;
     for (;;) {
-        switch (getopt(argc, argv, "tcwrulvz")) {
+        switch (getopt(argc, argv, "tcwrulvzX")) {
         case 't': ++trace_flag;  continue;
         case 'r': ++read_flag;   continue;
         case 'w': ++write_flag;  continue;
         case 'c': ++config_flag; continue;
         case 'u': ++csv_flag;    continue;
+        case 'X': ++clear_flag;  continue;
         case 'l': ++list_flag;   continue;
 	case 'v': ++verify_flag; continue;
         case 'z': ++validate_flag; continue;
@@ -106,8 +110,8 @@ int main(int argc, char **argv)
         radio_list();
         exit(0);
     }
-    if (read_flag + write_flag + config_flag + csv_flag + verify_flag + validate_flag > 1) {
-        fprintf(stderr, "Only one of -r, -w, -c, -v, -z or -u options is allowed.\n");
+    if (read_flag + write_flag + config_flag + csv_flag + verify_flag + validate_flag + clear_flag > 1) {
+        fprintf(stderr, "Only one of -r, -w, -c, -v, -z, -u or -X options is allowed.\n");
         usage();
     }
     setvbuf(stdout, 0, _IOLBF, 0);
@@ -187,6 +191,15 @@ int main(int argc, char **argv)
 
         radio_connect();
         radio_write_csv(argv[0]);
+        radio_disconnect();
+
+    } else if (clear_flag) {
+        // Clear entire contacts database on the device.
+        if (argc != 0)
+            usage();
+
+        radio_connect();
+        radio_clear_database();
         radio_disconnect();
 
     } else if (validate_flag) {

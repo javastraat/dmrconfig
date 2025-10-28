@@ -88,6 +88,11 @@ void radio_verify_config(void);
 void radio_write_csv(const char *filename);
 
 //
+// Clear entire contacts database.
+//
+void radio_clear_database(void);
+
+//
 // List all supported radios.
 //
 void radio_list(void);
@@ -116,6 +121,7 @@ struct _radio_device_t {
     int (*parse_row)(radio_device_t *radio, int table_id, int first_row, char *line);
     void (*update_timestamp)(radio_device_t *radio);
     void (*write_csv)(radio_device_t *radio, FILE *csv);
+    void (*clear_database)(radio_device_t *radio);
     int channel_count;
 };
 

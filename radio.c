@@ -476,3 +476,15 @@ int radio_is_compatible(const char *name)
     }
     return 0;
 }
+
+//
+// Clear entire contacts database.
+//
+void radio_clear_database(void)
+{
+    if (! device->clear_database) {
+        fprintf(stderr, "Function not supported by radio %s.\n", device->name);
+        exit(-1);
+    }
+    device->clear_database(device);
+}
