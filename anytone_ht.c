@@ -3065,6 +3065,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     unsigned addr = get_calldb_list_addr_for_radio(radio);
     unsigned index;
     unsigned total_bytes_written = 0;
+    unsigned total_expected_bytes = sz.count * 8 + nbytes;  // Map bytes + data bytes
 
 //#define DUMP_NO_WRITE
 #ifdef DUMP_NO_WRITE
@@ -3085,7 +3086,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 
         if (! trace_flag) {
             total_bytes_written += n;
-            int percent = (int)(total_bytes_written * 100 / original_nbytes);
+            int percent = (int)(total_bytes_written * 100 / total_expected_bytes);
             fprintf(stderr, "\rWrite: %u bytes... %d%%", original_nbytes, percent);
             fflush(stderr);
         }
@@ -3130,7 +3131,7 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
         if (! trace_flag) {
             // Continue cumulative byte count from map writing
             total_bytes_written += n;
-            int percent = (int)(total_bytes_written * 100 / original_nbytes);
+            int percent = (int)(total_bytes_written * 100 / total_expected_bytes);
             fprintf(stderr, "\rWrite: %u bytes... %d%%", original_nbytes, percent);
             fflush(stderr);
         }
