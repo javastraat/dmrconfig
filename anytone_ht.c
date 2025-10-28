@@ -3098,7 +3098,6 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     // TODO: Test if D868UV/D878UV/D878UV2 also need this trigger.
     if (is_d168uv_radio_ptr(radio)) {
         sz._unused3 = 1;  // Signal firmware to copy database
-        fprintf(stderr, "\nTriggering database copy for D168UV...\n");
     }
     serial_write_region(get_calldb_size_addr_for_radio(radio), (uint8_t*) &sz, 16);
 #endif
@@ -3164,8 +3163,10 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
 
     if (! trace_flag) {
         fprintf(stderr, " done.\n");
-        // For D168UV, remind user to reboot for database to take effect
+        
+        // For D168UV, show trigger message and remind user to reboot
         if (is_d168uv_radio_ptr(radio)) {
+            fprintf(stderr, "Triggering database copy for D168UV...\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "*** D168UV: Please REBOOT the radio for the database to take effect. ***\n");
             fprintf(stderr, "*** The radio will copy the database to internal memory on next boot. ***\n");

@@ -31,6 +31,9 @@
 #include "radio.h"
 #include "util.h"
 
+#ifndef VERSION
+#define VERSION "1.1.261"
+#endif
 const char version[] = VERSION;
 const char *copyright;
 
