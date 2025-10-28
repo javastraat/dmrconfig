@@ -3164,12 +3164,12 @@ static void anytone_ht_write_csv(radio_device_t *radio, FILE *csv)
     if (! trace_flag) {
         fprintf(stderr, " done.\n");
         
-        // For D168UV, show trigger message and remind user to reboot
+        // For D168UV, show trigger message with corrected information
         if (is_d168uv_radio_ptr(radio)) {
             fprintf(stderr, "Triggering database copy for D168UV...\n");
-            fprintf(stderr, "\n");
-            fprintf(stderr, "*** D168UV: Please REBOOT the radio for the database to take effect. ***\n");
-            fprintf(stderr, "*** The radio will copy the database to internal memory on next boot. ***\n");
+            fprintf(stderr, "Close device.\n");
+            fprintf(stderr, "*** The radio will copy the database to internal memory now. ***\n");
+            fprintf(stderr, "*** D168UV: The Radio will REBOOT for the database to take effect. ***\n");
         }
     }
     free(data);

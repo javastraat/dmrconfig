@@ -70,7 +70,10 @@ static radio_device_t *device;          // Device-dependent interface
 //
 void radio_disconnect()
 {
-    fprintf(stderr, "Close device.\n");
+    // For D168UV, the close message is printed as part of the trigger message
+    if (!device || !strstr(device->name, "D168UV")) {
+        fprintf(stderr, "Close device.\n");
+    }
 
     // Restore the normal radio mode.
     dfu_reboot();
